@@ -70,6 +70,36 @@ export type EffectModule = {
   visual?: VisualEffect
 }
 
+export type ModeId =
+  | 'circleLine'
+  // | 'boids'
+  // | 'conway'
+  // | 'buildings'
+  // | 'fourierShapes'
+  ;
+
+export type VisualParams = Record<string, number | string | boolean>;
+
+export type FramePacket = {
+  dt: number;
+  w: number; h: number;
+  params: VisualParams;
+  // keep raw audio arrays so visuals can derive their own simple features
+  freq?: Uint8Array;
+  time?: Uint8Array;
+};
+
+export interface VisualController {
+  /** Called once (or on resize) before use */
+  init(ctx: OffscreenCanvasRenderingContext2D, w: number, h: number): void;
+
+  /** Update internal state from current frame */
+  update(pkt: FramePacket): void;
+
+  /** Draw this controller’s contribution */
+  render(ctx: OffscreenCanvasRenderingContext2D): void;
+}
+
 
 // Worker protocol
 export type MsgToWorker =

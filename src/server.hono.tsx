@@ -58,66 +58,93 @@ app.get('/', (c) => c.html(<Page />))
 
 // Serve TypeScript from /src with extensionless + index resolution
 app.get('/src/*', async (c) => {
-  // 1) Parse & normalize
   const url = new URL(c.req.url);
-  // e.g. "/src/effects/keyboardADSR/dsp/chain"
-  const urlPath = decodeURI(url.pathname);
+  const originalPath = decodeURI(url.pathname); // e.g. "/src/visuals/circleLine" or "/src/index"
 
   const projectRoot = process.cwd();
 
-  // IMPORTANT: remove leading slash so path.join doesn't drop projectRoot
-  // urlPath is like "/src/..." -> relPath "src/..."
-  const relPath = urlPath.replace(/^\/+/, '');           // "src/effects/..."
-  const absBase = path.join(projectRoot, relPath);       // "<cwd>/src/effects/..."
-
-  // Security: must live under <projectRoot>/src
+  // Build a filesystem path from the URL (we'll try extensions and index.*)
+  const relPath = originalPath.replace(/^\/+/, '');     // "src/visuals/circleLine"
+  const absBase  = path.join(projectRoot, relPath);     // "<cwd>/src/visuals/circleLine"
   const normalized = path.normalize(absBase);
-  const srcRoot = path.join(projectRoot, 'src') + path.sep; // ensure trailing sep
+
+  // Security: must be under "<cwd>/src/"
+  const srcRoot = path.join(projectRoot, 'src') + path.sep;
   if (!normalized.startsWith(srcRoot)) {
     return c.text('Forbidden', 403);
   }
 
-  // 2) Candidate files
-  const tryPaths = [
-    normalized,                               // exact
-    normalized + '.ts',                       // foo.ts
-    normalized + '.tsx',                      // foo.tsx
-    normalized + '.js',                       // (optional) foo.js
-    path.join(normalized, 'index.ts'),        // foo/index.ts
-    path.join(normalized, 'index.tsx'),       // foo/index.tsx
-    path.join(normalized, 'index.js'),        // (optional) foo/index.js
+  // Candidate resolutions
+  const candidates = [
+    normalized,                                // exact
+    normalized + '.ts',
+    normalized + '.tsx',
+    normalized + '.js',
+    path.join(normalized, 'index.ts'),         // directory index
+    path.join(normalized, 'index.tsx'),
+    path.join(normalized, 'index.js'),
   ];
 
-  // 3) Tiny transpile cache (path -> {mtime, code})
+  // Transpile cache
   type CacheEntry = { mtimeMs: number; code: string };
-  const cache: Map<string, CacheEntry> = (globalThis as any).__tsCache ?? new Map();
-  (globalThis as any).__tsCache = cache;
+  const cache: Map<string, CacheEntry> =
+    ((globalThis as any).__tsCache ??= new Map<string, CacheEntry>());
 
-  for (const p of tryPaths) {
+  // Helper to serve file (TS/TSX transpiled)
+  const serveFile = async (p: string) => {
     const f = Bun.file(p);
-    if (!(await f.exists())) continue;
-
     const stat = await f.stat();
     const hit = cache.get(p);
     if (hit && hit.mtimeMs === stat.mtimeMs) {
-      return c.newResponse(hit.code, 200, { 'content-type': 'application/javascript; charset=utf-8' });
+      return c.newResponse(hit.code, 200, {
+        'content-type': 'application/javascript; charset=utf-8',
+        'cache-control': 'no-cache',
+      });
+    }
+    const src = await f.text();
+    const isTS = p.endsWith('.ts') || p.endsWith('.tsx');
+    const code = isTS ? transpiler.transformSync(src) : src;
+    cache.set(p, { mtimeMs: stat.mtimeMs, code });
+    return c.newResponse(code, 200, {
+      'content-type': 'application/javascript; charset=utf-8',
+      'cache-control': 'no-cache',
+    });
+  };
+
+  // Try to resolve a real file
+  for (const p of candidates) {
+    const f = Bun.file(p);
+    if (!(await f.exists())) continue;
+
+    const isIndexFile =
+      p.endsWith(path.sep + 'index.ts') ||
+      p.endsWith(path.sep + 'index.tsx') ||
+      p.endsWith(path.sep + 'index.js');
+
+    const incomingIsExplicitFile = /\.[tj]sx?$/.test(originalPath); // user asked for a file path
+    const incomingLooksLikeDir   = !incomingIsExplicitFile;         // bare import / folder path
+
+    if (isIndexFile && incomingLooksLikeDir) {
+      // Serve a tiny re-export stub instead of redirecting.
+      // Determine which index.* we actually found to point the stub there.
+      const indexSuffix = p.slice(p.lastIndexOf('/index.')); // "index.ts" | "index.tsx" | "index.js"
+      const targetUrl = originalPath.replace(/\/+$/, '') + '/' + indexSuffix; // "/src/dir/index.ts"
+
+      const stub = `export * from '${targetUrl}';
+export { default } from '${targetUrl}';`;
+
+      return c.newResponse(stub, 200, {
+        'content-type': 'application/javascript; charset=utf-8',
+        'cache-control': 'no-cache',
+      });
     }
 
-    let code: string;
-    const src = await f.text();
-    // Transpile only TS/TSX; pass-through JS
-    if (p.endsWith('.ts') || p.endsWith('.tsx')) {
-      code = transpiler.transformSync(src);
-    } else {
-      code = src;
-    }
-    cache.set(p, { mtimeMs: stat.mtimeMs, code });
-    return c.newResponse(code, 200, { 'content-type': 'application/javascript; charset=utf-8' });
+    // Otherwise, just serve the actual file
+    return await serveFile(p);
   }
 
   return c.text('Not found', 404);
 });
-
 
 
 serve({ fetch: app.fetch, port: 3000 })
