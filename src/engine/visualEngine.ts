@@ -1,6 +1,8 @@
 // src/engine/visualEngine.ts
 import type { FramePacket, ModeId, VisualController, VisualEffect } from './protocol'
-import { CircleLine } from '../visuals/circleLine.mod' 
+import { CircleLine } from '../visuals/circleLine.mod'
+import { Boids } from '../visuals/boids.mod'
+
 
 export class VisualEngine {
   private ctx!: OffscreenCanvasRenderingContext2D
@@ -34,12 +36,10 @@ export class VisualEngine {
   private ensureController(mode: ModeId): VisualController {
     let c = this.controllers.get(mode)
     if (!c) {
-      // local switch; add future controllers here
       switch (mode) {
+        case 'boids': c = new Boids(); break
         case 'circleLine':
-        default:
-          c = new CircleLine()
-          break
+        default: c = new CircleLine(); break
       }
       c.init(this.ctx, this.w, this.h)
       this.controllers.set(mode, c)
@@ -57,10 +57,10 @@ export class VisualEngine {
     })()
 
     const clamp01 = (x: number) => Math.max(0, Math.min(1, x))
-    const fbOn   = params['fb.on'] !== false
-    const amt    = clamp01(Number(params['fb.amount'] ?? 0.25))
-    const len    = clamp01(Number(params['fb.length'] ?? 0.6))
-    const timeS  = Math.max(0.001, Math.min(2.0, Number(params['fb.time'] ?? 240) / 1000))
+    const fbOn = params['fb.on'] !== false
+    const amt = clamp01(Number(params['fb.amount'] ?? 0.25))
+    const len = clamp01(Number(params['fb.length'] ?? 0.6))
+    const timeS = Math.max(0.001, Math.min(2.0, Number(params['fb.time'] ?? 240) / 1000))
     const morphSpeed = Math.max(0.05, Number(params['morph.speed'] ?? 1.5))
 
     const targetParam = (params['vis.mode'] ?? 'circleLine') as ModeId

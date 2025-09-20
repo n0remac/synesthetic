@@ -1,4 +1,4 @@
-// src/index.ts
+// src/app.ts
 import type { EffectModule, VisualEffect } from './engine/protocol';
 import { createChain, disconnectChain } from './audio/dsp/chain';
 import { createVoicePool } from './audio/dsp/voicePool';
@@ -16,7 +16,9 @@ const info = {
     { id: 'lfo', label: 'LFO / Mod', color: '#1b2616', enabledParam: 'lfo.on' },
     { id: 'env', label: 'Envelope', color: '#261c16', enabledParam: 'env.on' },
     { id: 'fb', label: 'Feedback', color: '#262012', enabledParam: 'fb.on' },
-    { id: 'vis', label: 'Visuals', color: '#121a1a', enabledParam: 'vis.on' },
+    { id: 'vis', label: 'Visuals', color: '#121a1a' },
+    { id: 'circle', label: 'Circle / Line', color: '#10121a' },
+    { id: 'boids', label: 'Boids', color: '#0f1410' },
   ],
 };
 
@@ -27,7 +29,6 @@ const schema = {
   'lfo.on': { kind: 'toggle', label: 'Enable', default: true, ui: { section: 'lfo' } },
   'env.on': { kind: 'toggle', label: 'Enable', default: true, ui: { section: 'env' } },
   'fb.on': { kind: 'toggle', label: 'Enable', default: true, ui: { section: 'fb' } },
-  'vis.on': { kind: 'toggle', label: 'Enable', default: true, ui: { section: 'vis' } },
 
   // Osc
   'osc.type': { kind: 'enum', label: 'Wave', options: ['sine', 'square', 'triangle', 'sawtooth'] as const, default: 'sine', ui: { section: 'osc' } },
@@ -51,16 +52,17 @@ const schema = {
   'fb.length': { kind: 'number', label: 'FB Length', min: 0, max: 1, step: 0.01, default: 0.6, ui: { section: 'fb' } },
   'fb.amount': { kind: 'number', label: 'FB Amount (mix)', min: 0, max: 1, step: 0.01, default: 0.25, ui: { section: 'fb' } },
 
-  // Visual controls (existing)
-  'vis.blueGain': { kind: 'number', label: 'Blue Gain', min: 0, max: 4, step: 0.01, default: 1, ui: { section: 'vis' } },
-  'vis.whiteGain': { kind: 'number', label: 'White Gain', min: 0, max: 4, step: 0.01, default: 1, ui: { section: 'vis' } },
-  'vis.shape': { kind: 'number', label: 'Shape (Line↔Ring)', min: 0, max: 1, step: 0.001, default: 1, ui: { section: 'vis' } },
-
-  // NEW: Mode selection + morphing
-  'vis.mode': { kind: 'enum', label: 'Visual Mode', options: ['circleLine'] as const, default: 'circleLine', ui: { section: 'vis' } },
+  // Visuals — ONLY mode/morph live here now
+  'vis.mode': { kind: 'enum', label: 'Visual Mode', options: ['circleLine', 'boids'] as const, default: 'boids', ui: { section: 'vis' } },
   'morph.speed': { kind: 'number', label: 'Morph Speed (s)', min: 0.05, max: 5, step: 0.01, default: 1.5, ui: { section: 'vis' } },
-  // reserved for particle-based detach later:
-  // 'morph.percent': { kind: 'number', label: 'Detach %', min: 0, max: 1, step: 0.001, default: 0, ui: { section: 'vis' } },
+
+  // CircleLine-specific controls — moved here
+  'vis.blueGain': { kind: 'number', label: 'Blue Gain', min: 0, max: 4, step: 0.01, default: 1, ui: { section: 'circle' } },
+  'vis.whiteGain': { kind: 'number', label: 'White Gain', min: 0, max: 4, step: 0.01, default: 1, ui: { section: 'circle' } },
+  'vis.shape': { kind: 'number', label: 'Shape (Line↔Ring)', min: 0, max: 1, step: 0.001, default: 1, ui: { section: 'circle' } },
+
+  // Boids-specific controls (you already have kAtk here)
+  'boids.kAtk': { kind: 'number', label: 'Attack → Separation', min: 0, max: 20, step: 0.1, default: 10, ui: { section: 'boids' } },
 } as const;
 
 const LOOKAHEAD = 0.012;

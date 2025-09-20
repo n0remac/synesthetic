@@ -57,6 +57,8 @@ export function buildControls(
     wrap.style.padding = '10px';
     wrap.style.margin = '10px 0';
 
+    (wrap as HTMLElement).dataset.section = sec.id
+
     // Header: label + toggle (if provided)
     const head = el('div', 'sec-head row');
     const title = el('div', 'label'); title.textContent = sec.label;

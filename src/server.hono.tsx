@@ -12,7 +12,7 @@ const Page = () => (
     <head>
       <meta charSet="utf-8" />
       <meta name="viewport" content="width=device-width,initial-scale=1" />
-      <title>AV Mini Synth (Registry)</title>
+      <title>AV Mini Synth</title>
       <style>{`
 :root{color-scheme:dark}
 body{margin:0;font-family:system-ui,sans-serif;background:#0b0b0b;color:#eee}
@@ -25,7 +25,6 @@ select,input,button{background:#1a1a1a;color:#eee;border:1px solid #2a2a2a;borde
 .label{opacity:.8}
 header{display:flex;align-items:center;gap:8px;position:sticky;top:0;background:#121212;padding:8px 0 12px}
 header h2{margin:0;font-size:18px}
-.spacer{flex:1}
 .sec-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
 `}</style>
     </head>
@@ -35,13 +34,7 @@ header h2{margin:0;font-size:18px}
         <div className="panel">
           <header>
             <h2>AV Mini Synth</h2>
-            <span className="spacer" />
-            <button id="start" type="button">Start</button>
           </header>
-          <div className="row">
-            <span className="label">Effect</span>
-            <select id="effect"></select>
-          </div>
           <form id="controls" className="panel"></form>
         </div>
       </div>
@@ -49,6 +42,7 @@ header h2{margin:0;font-size:18px}
     </body>
   </html>
 )
+
 
 
 const app = new Hono()
@@ -65,7 +59,7 @@ app.get('/src/*', async (c) => {
 
   // Build a filesystem path from the URL (we'll try extensions and index.*)
   const relPath = originalPath.replace(/^\/+/, '');     // "src/visuals/circleLine"
-  const absBase  = path.join(projectRoot, relPath);     // "<cwd>/src/visuals/circleLine"
+  const absBase = path.join(projectRoot, relPath);     // "<cwd>/src/visuals/circleLine"
   const normalized = path.normalize(absBase);
 
   // Security: must be under "<cwd>/src/"
@@ -122,7 +116,7 @@ app.get('/src/*', async (c) => {
       p.endsWith(path.sep + 'index.js');
 
     const incomingIsExplicitFile = /\.[tj]sx?$/.test(originalPath); // user asked for a file path
-    const incomingLooksLikeDir   = !incomingIsExplicitFile;         // bare import / folder path
+    const incomingLooksLikeDir = !incomingIsExplicitFile;         // bare import / folder path
 
     if (isIndexFile && incomingLooksLikeDir) {
       // Serve a tiny re-export stub instead of redirecting.

@@ -72,7 +72,7 @@ export type EffectModule = {
 
 export type ModeId =
   | 'circleLine'
-  // | 'boids'
+  | 'boids'
   // | 'conway'
   // | 'buildings'
   // | 'fourierShapes'
