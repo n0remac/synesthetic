@@ -1,0 +1,8 @@
+{
+  "name": "av-mini-synth",
+  "private": true,
+  "scripts": {
+    "dev": "bun run src/server.hono.tsx"
+  },
+  "type": "module"
+}
