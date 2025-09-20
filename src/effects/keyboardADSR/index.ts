@@ -50,7 +50,9 @@ const schema = {
   'fb.amount': { kind: 'number', label: 'FB Amount (mix)', min: 0, max: 1, step: 0.01, default: 0.25, ui: { section: 'fb' } },
 
   // Visual
-  'vis.gain': { kind: 'number', label: 'Visual Gain', min: 0, max: 4, step: 0.01, default: 1, ui: { section: 'vis' } },
+  'vis.blueGain': { kind: 'number', label: 'Blue Gain', min: 0, max: 4, step: 0.01, default: 1, ui: { section: 'vis' } },
+  'vis.whiteGain': { kind: 'number', label: 'White Gain', min: 0, max: 4, step: 0.01, default: 1, ui: { section: 'vis' } },
+  'vis.shape': { kind: 'number', label: 'Shape (Line↔Ring)', min: 0, max: 1, step: 0.001, default: 1, ui: { section: 'vis' } },
 } as const;
 
 
@@ -93,7 +95,7 @@ const audio = {
         // --- OSC toggle ---
         // We handle “don’t start new notes” at the keyboard layer typically.
         // If you also want a hard mute when off, uncomment:
-        // if (!oscOn) { /* optionally: iterate voices and ramp env.gain to 0 quickly */ }
+        if (!oscOn) { /* optionally: iterate voices and ramp env.gain to 0 quickly */ }
 
         // --- FILTER (bypass by neutralizing when off) ---
         if (!filtOn) {
@@ -198,8 +200,9 @@ const visual: VisualEffect = {
 
     const w = (ctx.canvas as OffscreenCanvas).width;
     const h = (ctx.canvas as OffscreenCanvas).height;
+    const cx = w / 2, cy = h / 2;
 
-    // Get/create trail buffer
+    // Acquire trail buffer
     // @ts-expect-error
     let trail: OffscreenCanvas = ctx.__trail;
     // @ts-expect-error
@@ -229,76 +232,171 @@ const visual: VisualEffect = {
 
     // Params
     const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
-    const fbOn  = params['fb.on'] !== false;
-    const amt   = clamp01(Number(params['fb.amount'] ?? 0.25));
-    const len   = clamp01(Number(params['fb.length'] ?? 0.6));
-    const timeS = Math.max(0.001, Math.min(2.0, Number(params['fb.time'] ?? 240) / 1000));
-    const VIS_GAIN = Number(params['vis.gain'] ?? 1);
+    const fbOn   = params['fb.on'] !== false;
+    const amt    = clamp01(Number(params['fb.amount'] ?? 0.25));
+    const len    = clamp01(Number(params['fb.length'] ?? 0.6));
+    const timeS  = Math.max(0.001, Math.min(2.0, Number(params['fb.time'] ?? 240) / 1000));
+    const visGainGlobal = Number(params['vis.gain'] ?? 1);
+    const blueGain  = Number(params['vis.blueGain']  ?? 1) * visGainGlobal;
+    const whiteGain = Number(params['vis.whiteGain'] ?? 1) * visGainGlobal;
+    const shape     = clamp01(Number(params['vis.shape'] ?? 1)); // 0=line, 1=ring
 
     // Audio-matched decay
     const g = Math.min(0.95, Math.pow(len, 0.6) * 0.95);
     const f = Math.pow(g, Math.max(0.001, DT) / Math.max(0.001, timeS));
     const decayAlpha = 1 - f;
 
-    // --- Trail handling ---
+    // Trail handling
     if (fbOn) {
-      // 1) DECAY trail
       tctx.globalCompositeOperation = 'source-over';
       tctx.globalAlpha = 1;
       tctx.fillStyle = `rgba(0,0,0,${decayAlpha})`;
       tctx.fillRect(0, 0, w, h);
     } else {
-      // Feedback OFF: keep trail cleared so no residuals when toggled back on
       tctx.globalCompositeOperation = 'source-over';
       tctx.globalAlpha = 1;
       tctx.fillStyle = '#000';
       tctx.fillRect(0, 0, w, h);
     }
 
-    // 2) FRESH FRAME on main canvas (always draw visuals)
+    // 2) Fresh frame
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, w, h);
 
-    const cx = w / 2, cy = h / 2;
+    // Morph helpers (start at top: angle offset = -90°)
+    const ANGLE0 = -Math.PI / 2; // top
+    const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
-    // Blue radial spectrum (FFT)
+    // line baselines (fold away as shape→0)
+    const baseGap = 48;              // gap at full ring (small, for nice transition)
+    const extraGap = 120;            // additional gap as it flattens
+    const gap = baseGap + extraGap * (1 - shape); // separates the two lines
+
+    // gentle arch while straightening (so it "curves up" in 2D)
+    // arch magnitude fades out to 0 as shape→0 (at perfect lines)
+    const archK = 40 * shape; // pixels of arc at mid
+
+    // map a normalized 0..1 position to [left..right] x on the line
+    const xFromT = (tNorm: number) => lerp(w * 0.12, w * 0.88, tNorm);
+
+    // Draw a morphing path from half-ring → line
+    function drawMorphPath({
+      N,
+      sampleAt,           // (i) -> amplitude [-1..1] or [0..1] scaled already
+      ringBaseR,          // base ring radius
+      ringScale,          // multiplier for amplitude on the ring radius
+      lineY,              // baseline Y for line (upper or lower)
+      stroke, width,
+    }: {
+      N: number;
+      sampleAt: (i: number) => number;
+      ringBaseR: number;
+      ringScale: number;
+      lineY: number;
+      stroke: string;
+      width: number;
+    }) {
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = width;
+
+      // We draw two independent paths (halves), so ends detach
+      const halves: Array<{ i0: number; i1: number }> = [
+        { i0: 0,      i1: Math.floor(N / 2) },      // top→bottom (first half)
+        { i0: Math.floor(N / 2), i1: N - 1 },       // bottom→top (second half)
+      ];
+
+      for (const { i0, i1 } of halves) {
+        ctx.beginPath();
+        const dir = i1 >= i0 ? 1 : -1;
+        for (let i = i0; dir > 0 ? i <= i1 : i >= i1; i += dir) {
+          const tNorm = i / (N - 1);
+
+          // Angle runs 0..2π with start at top
+          const ang = ANGLE0 + tNorm * Math.PI * 2;
+
+          // Sample (“amplitude”)
+          const a = sampleAt(i); // already scaled by ringScale/line scale outside as needed
+
+          // Ring coords
+          const rRing = ringBaseR + a * ringScale;
+          const xRing = cx + Math.cos(ang) * rRing;
+          const yRing = cy + Math.sin(ang) * rRing;
+
+          // Line coords
+          const xLine = xFromT((i - i0) / (i1 - i0 || 1)); // 0..1 across half
+          // arch along the half (cosine arch, peak in the middle)
+          const arch = archK * Math.cos(((i - i0) / (i1 - i0 || 1)) * Math.PI);
+          const yLine = lineY + a * ringScale * 0.25 + arch; // a slight amplitude on line too
+
+          // Morph
+          const x = lerp(xLine, xRing, shape);
+          const y = lerp(yLine, yRing, shape);
+
+          if (i === i0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        // Do NOT close — keeps ends detached
+        ctx.stroke();
+      }
+    }
+
+    // ---- Blue (FFT) ----
     if (freq && freq.length) {
-      const step = Math.floor(freq.length / 64) || 1;
-      ctx.strokeStyle = 'hsl(200,80%,70%)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      for (let i = 0; i < 64; i++) {
-        const v = (freq[i * step] / 255) * VIS_GAIN;
-        const ang = (i / 64) * Math.PI * 2;
-        const r = 120 + v * 160; // inner ring
-        const x = cx + Math.cos(ang) * r;
-        const y = cy + Math.sin(ang) * r;
-        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-      }
-      ctx.closePath();
-      ctx.stroke();
+      const step = Math.max(1, Math.floor(freq.length / 128)); // finer sampling for smoother arcs
+      const N = 128;
+      const sampleAt = (i: number) => {
+        const idx = Math.min(freq.length - 1, i * step);
+        return (freq[idx] / 255) * blueGain; // 0..blueGain
+      };
+
+      // upper/lower halves fold away
+      drawMorphPath({
+        N,
+        sampleAt,
+        ringBaseR: 130,
+        ringScale: 140,
+        lineY: cy - gap,           // upper line
+        stroke: 'hsl(200,80%,70%)',
+        width: 2,
+      });
+      drawMorphPath({
+        N,
+        sampleAt,
+        ringBaseR: 130,
+        ringScale: 140,
+        lineY: cy + gap,           // lower line
+        stroke: 'hsl(200,80%,70%)',
+        width: 2,
+      });
     }
 
-    // White waveform ring (time domain)
+    // ---- White (time-domain) ----
     if (time && time.length) {
-      ctx.strokeStyle = 'white';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      for (let i = 0; i < time.length; i++) {
-        const s = (time[i] - 128) / 128;
-        const ang = (i / time.length) * Math.PI * 2;
-        const r = 200 + s * 40 * VIS_GAIN;
-        const x = cx + Math.cos(ang) * r;
-        const y = cy + Math.sin(ang) * r;
-        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-      }
-      ctx.closePath();
-      ctx.stroke();
+      const N = time.length;
+      const sampleAt = (i: number) => ((time[i] - 128) / 128) * whiteGain * 2; // -whiteGain..+whiteGain
+
+      drawMorphPath({
+        N,
+        sampleAt,
+        ringBaseR: 210,
+        ringScale: 40,
+        lineY: cy - gap * 0.6,     // place near upper
+        stroke: 'white',
+        width: 1,
+      });
+      drawMorphPath({
+        N,
+        sampleAt,
+        ringBaseR: 210,
+        ringScale: 40,
+        lineY: cy + gap * 0.6,     // and near lower
+        stroke: 'white',
+        width: 1,
+      });
     }
 
-    // 3) MIX current frame into trail (only when feedback is ON)
+    // 3) MIX into trail (only when feedback ON)
     if (fbOn && amt > 0) {
       tctx.save();
       tctx.globalCompositeOperation = 'source-over';
@@ -309,7 +407,7 @@ const visual: VisualEffect = {
       tctx.restore();
     }
 
-    // 4) COMPOSITE trail behind the fresh drawing (only when feedback is ON)
+    // 4) COMPOSITE trail
     if (fbOn) {
       ctx.globalCompositeOperation = 'source-over';
       ctx.globalAlpha = 1;
