@@ -63,6 +63,17 @@ const schema = {
 
   // Boids-specific controls (you already have kAtk here)
   'boids.kAtk': { kind: 'number', label: 'Attack → Separation', min: 0, max: 20, step: 0.1, default: 10, ui: { section: 'boids' } },
+  'boids.attrDistMul': { kind: 'number', label: 'Attract Distance ×R', min: 0.5, max: 6, step: 0.1, default: 3, ui: { section: 'boids' } },
+  'boids.attrStrength': { kind: 'number', label: 'Attract Strength', min: 0, max: 600, step: 1, default: 180, ui: { section: 'boids' } },
+  'boids.showSphere': { kind: 'toggle', label: 'Show Attractor Area', default: true, ui: { section: 'boids' } },
+  'boids.bugCount': { kind: 'number', label: 'Bug Count', min: 1, max: 30, step: 1, default: 6, ui: { section: 'boids' } },
+  'boids.bugTightness': { kind: 'number', label: 'Bug Tightness', min: 0, max: 1, step: 0.01, default: 0.5, ui: { section: 'boids' } },
+  // how strongly boids “lock on” to bugs while a note is held
+  'boids.bugFocus': { kind: 'number', label: 'Bug Focus', min: 0, max: 3, step: 0.05, default: 1.2, ui: { section: 'boids' } },
+  'boids.streamSpeed': { kind: 'number', label: 'Bug Stream Speed', min: 0, max: 300, step: 1, default: 55, ui: { section: 'boids' } },
+  'boids.turnGain': { kind: 'number', label: 'Bug Turn Gain', min: 0, max: 6, step: 0.05, default: 2.5, ui: { section: 'boids' } },
+
+
 } as const;
 
 const LOOKAHEAD = 0.012;
