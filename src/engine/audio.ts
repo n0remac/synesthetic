@@ -17,8 +17,34 @@ export class AudioEngine {
     }
 
 
-    async resume() { await this.ctx.resume() }
+    private ensureCtx(): AudioContext {
+        if (!this.ctx) {
+            this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)({
+                latencyHint: 'interactive'
+            });
+        }
+        return this.ctx;
+    }
 
+    async resume(): Promise<void> {
+        const ctx = this.ensureCtx();
+        if (ctx.state === 'suspended') {
+            await ctx.resume();
+        }
+        // iOS Safari sometimes needs a short silent tick to fully unlock
+        try {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            gain.gain.value = 0;
+            osc.connect(gain).connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.01);
+        } catch { }
+    }
+
+    get context(): AudioContext {
+        return this.ensureCtx();
+    }
 
     mountEffect(mod: EffectModule, params: EffectParams) {
         this.unmount()

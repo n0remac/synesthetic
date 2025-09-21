@@ -1,34 +1,427 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>AV Mini Synth</title>
-    <style>
-      :root{color-scheme:dark}
-      body{margin:0;font-family:system-ui,sans-serif;background:#0b0b0b;color:#eee}
-      .wrap{display:grid;grid-template-columns:1fr 340px;gap:16px;height:100vh}
-      canvas{width:100%;height:100%;display:block;background:#000}
-      .panel{padding:12px;overflow:auto;background:#121212;border-left:1px solid #222}
-      .row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;margin:8px 0}
-      input[type=range]{width:160px}
-      select,input,button{background:#1a1a1a;color:#eee;border:1px solid #2a2a2a;border-radius:8px;padding:6px}
-      .label{opacity:.8}
-      header{display:flex;align-items:center;gap:8px;position:sticky;top:0;background:#121212;padding:8px 0 12px}
-      header h2{margin:0;font-size:18px}
-      .sec-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
-    </style>
-  </head>
-  <body>
-    <div class="wrap">
-      <canvas id="view" width="1280" height="720"></canvas>
-      <div class="panel">
-        <header>
-          <h2>AV Mini Synth</h2>
-        </header>
-        <form id="controls" class="panel"></form>
-      </div>
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AV Mini Synth</title>
+  <style>
+    /* ---------- base ---------- */
+    :root {
+      color-scheme: dark;
+      --piano-h: 120px;
+      /* JS updates this on load/resize */
+    }
+
+    html,
+    body {
+      height: 100%;
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, sans-serif;
+      background: #0b0b0b;
+      color: #eee;
+    }
+
+    .wrap {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 16px;
+      height: 100vh;
+      height: 100svh;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      background: #000;
+      touch-action: manipulation;
+    }
+
+    .panel {
+      padding: 12px;
+      overflow: auto;
+      background: #121212;
+      border-left: 1px solid #222;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+      margin: 8px 0;
+    }
+
+    input[type="range"] {
+      width: 160px;
+    }
+
+    select,
+    input,
+    button {
+      background: #1a1a1a;
+      color: #eee;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      padding: 10px;
+    }
+
+    .label {
+      opacity: .8;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      position: sticky;
+      top: 0;
+      background: #121212;
+      padding: 8px 0 12px;
+      z-index: 1;
+    }
+
+    header h2 {
+      margin: 0;
+      font-size: 18px;
+    }
+
+    .sec-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    /* ---------- mobile split layout ---------- */
+    @media (max-width: 768px) {
+
+      html,
+      body {
+        overflow: hidden;
+      }
+
+      /* page itself doesn't scroll */
+      .wrap {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr 1fr;
+        /* top visuals, bottom controls */
+        gap: 8px;
+        height: 100svh;
+        padding-bottom: calc(var(--piano-h) + env(safe-area-inset-bottom));
+        /* leave room for piano */
+      }
+
+      .panel {
+        height: 100%;
+        max-height: 100%;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        border-left: none;
+        border-top: 1px solid #222;
+        /* Reserve space so last sliders scroll above the piano */
+        padding-bottom: calc(var(--piano-h) + 24px + env(safe-area-inset-bottom));
+        scroll-padding-bottom: calc(var(--piano-h) + 24px + env(safe-area-inset-bottom));
+      }
+
+      .panel::after {
+        content: "";
+        display: block;
+        height: calc(var(--piano-h) + 16px + env(safe-area-inset-bottom));
+        pointer-events: none;
+      }
+
+      .row {
+        grid-template-columns: 1fr;
+        gap: 6px;
+      }
+
+      input[type="range"] {
+        width: 100%;
+      }
+    }
+
+    /* ---------- desktop help footer ---------- */
+    #desktop-help {
+      position: fixed;
+      left: 16px;
+      right: 16px;
+      bottom: 16px;
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: rgba(18, 18, 18, .92);
+      border: 1px solid #2a2a2a;
+      border-radius: 12px;
+      padding: 10px 12px;
+      color: #ddd;
+      z-index: 12;
+      backdrop-filter: blur(6px);
+    }
+
+    #desktop-help button {
+      background: #1a1a1a;
+      color: #eee;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      padding: 8px 10px;
+      cursor: pointer;
+    }
+
+    #desktop-help .msg {
+      font-size: 13px;
+      line-height: 1.25;
+    }
+
+    #desktop-help .toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    #desktop-help input[type="checkbox"] {
+      accent-color: #888;
+    }
+
+    #desktop-help .actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #desktop-help .dontshow {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    #desktop-help .actions button {
+      background: #1a1a1a;
+      color: #eee;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      padding: 8px 10px;
+      cursor: pointer;
+    }
+
+    @media (min-width: 769px) {
+      #desktop-help {
+        display: flex;
+      }
+    }
+
+    html.show-desktop-piano #desktop-help,
+    html.help-dismissed #desktop-help {
+      display: none;
+    }
+
+    /* ---------- piano ---------- */
+    #piano {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: calc(var(--piano-h) + env(safe-area-inset-bottom));
+      background: #0e0e0e;
+      border-top: 1px solid #222;
+      z-index: 10;
+      display: none;
+      /* default hidden on desktop */
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    /* show piano on mobile by default */
+    @media (max-width: 768px) {
+      #piano {
+        display: block;
+      }
+    }
+
+    /* show piano on desktop when toggled */
+    @media (min-width: 769px) {
+      html.show-desktop-piano #piano {
+        display: block;
+      }
+
+      html.show-desktop-piano .wrap {
+        padding-bottom: calc(var(--piano-h) + env(safe-area-inset-bottom));
+      }
+
+      html.show-desktop-piano .panel {
+        padding-bottom: calc(var(--piano-h) + 16px + env(safe-area-inset-bottom));
+        scroll-padding-bottom: calc(var(--piano-h) + 16px + env(safe-area-inset-bottom));
+      }
+    }
+
+    /* layers */
+    #piano .white-keys,
+    #piano .black-keys {
+      position: absolute;
+      left: 0;
+      right: 0;
+      pointer-events: none;
+      /* let keys handle events */
+    }
+
+    #piano .white-keys {
+      top: 0;
+      bottom: 0;
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 2px;
+      padding: 6px 8px calc(6px + env(safe-area-inset-bottom)) 8px;
+    }
+
+    #piano .black-keys {
+      top: 0;
+      height: 70%;
+    }
+
+    /* black keys shorter */
+
+    /* white keys */
+    #piano .white {
+      all: unset;
+      pointer-events: auto;
+      background: linear-gradient(#fff, #e9e9e9);
+      border: 1px solid #bfbfbf;
+      border-bottom-color: #8f8f8f;
+      border-radius: 6px;
+      box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .15);
+      color: #222;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      font-size: 12px;
+      user-select: none;
+      touch-action: none;
+    }
+
+    #piano .white.active {
+      background: linear-gradient(#f2f2f2, #dcdcdc);
+      box-shadow: inset 0 -1px 0 rgba(0, 0, 0, .2);
+      transform: translateY(1px);
+    }
+
+    /* black keys */
+    #piano .black {
+      all: unset;
+      pointer-events: auto;
+      position: absolute;
+      top: 6px;
+      /* width is 60% of a white key’s width */
+      width: calc((100% / 7) * 0.6);
+      left: calc((var(--pos) + 1) * (100% / 7) - ((100% / 7) * 0.3));
+      height: calc(70% - 8px);
+      background: linear-gradient(#222, #111);
+      border: 1px solid #000;
+      border-radius: 6px;
+      box-shadow: 0 3px 0 rgba(0, 0, 0, .6), inset 0 -2px 0 rgba(255, 255, 255, .06);
+      color: #ddd;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      font-size: 11px;
+      user-select: none;
+      touch-action: none;
+    }
+
+    #piano .black.active {
+      background: linear-gradient(#1b1b1b, #0e0e0e);
+      box-shadow: 0 2px 0 rgba(0, 0, 0, .6), inset 0 -1px 0 rgba(255, 255, 255, .05);
+      transform: translateY(1px);
+    }
+
+    /* audio unlock button (mobile only) */
+    @media (max-width: 768px) {
+      #audio-unlock {
+        display: block;
+      }
+
+      .audio-on #audio-unlock {
+        display: none;
+      }
+    }
+
+    /* interaction hygiene */
+    #view,
+    #piano button,
+    #piano .key {
+      touch-action: none;
+      /* no pan/zoom/long-press */
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      /* iOS long-press menu */
+      -webkit-tap-highlight-color: transparent;
+    }
+  </style>
+
+</head>
+
+<body>
+  <button id="audio-unlock" aria-label="Start audio" style="
+  position:fixed; inset:auto 16px 16px 16px; height:48px;
+  border-radius:12px; border:1px solid #2a2a2a; background:#161616; color:#fff;
+  display:none; z-index:20;
+">Tap to Start Audio</button>
+  <div class="wrap">
+    <canvas id="view" width="1280" height="720"></canvas>
+    <div class="panel">
+      <header>
+        <h2>Be careful if using headphones!</h2>
+      </header>
+      <form id="controls" class="panel"></form>
     </div>
-    <script type="module" src="/src/client.ts"></script>
-  </body>
+  </div>
+  <script type="module" src="/src/client.ts"></script>
+  <!-- Mobile piano (7 white keys + 5 black keys) -->
+  <div id="piano" aria-label="Piano keys (mobile)">
+    <div class="white-keys">
+      <button class="white" data-code="KeyA" aria-label="C"></button>
+      <button class="white" data-code="KeyS" aria-label="D"></button>
+      <button class="white" data-code="KeyD" aria-label="E"></button>
+      <button class="white" data-code="KeyF" aria-label="F"></button>
+      <button class="white" data-code="KeyG" aria-label="G"></button>
+      <button class="white" data-code="KeyH" aria-label="A"></button>
+      <button class="white" data-code="KeyJ" aria-label="B"></button>
+    </div>
+
+    <!-- Black keys are positioned between whites using --pos (0..5 with 2 skipped) -->
+    <div class="black-keys">
+      <button class="black" style="--pos:0" data-code="KeyW" aria-label="C sharp"></button>
+      <button class="black" style="--pos:1" data-code="KeyE" aria-label="D sharp"></button>
+      <!-- (no black key between E and F) -->
+      <button class="black" style="--pos:3" data-code="KeyT" aria-label="F sharp"></button>
+      <button class="black" style="--pos:4" data-code="KeyY" aria-label="G sharp"></button>
+      <button class="black" style="--pos:5" data-code="KeyU" aria-label="A sharp"></button>
+    </div>
+  </div>
+
+  <!-- Desktop keyboard help -->
+  <div id="desktop-help" role="region" aria-label="Keyboard help (desktop)">
+    <div class="msg">
+      Tip: play notes with your computer keyboard — A S D F G H J for white keys and
+      W E T Y U for black keys.
+    </div>
+    <div class="actions">
+      <label class="dontshow">
+        <input type="checkbox" id="help-dont-show">
+        <span>Don’t show again</span>
+      </label>
+      <button id="dismiss-help" type="button" aria-label="Dismiss help">Dismiss</button>
+    </div>
+  </div>
+
+</body>
+
 </html>
