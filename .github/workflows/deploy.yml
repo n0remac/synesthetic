@@ -1,0 +1,43 @@
+name: Deploy Synesthetic (static)
+
+on:
+  push:
+    branches: [ "main" ]
+
+env:
+  REMOTE_HOST: ${{ secrets.DO_HOST }}
+  REMOTE_USER: ${{ secrets.DO_USER }}
+  REMOTE_PATH: ${{ secrets.DO_PATH }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Use your real build steps; ensure output is ./dist
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install deps
+        run: bun install  # or bun install --frozen-lockfile after you commit bun.lockb
+
+      - name: Build
+        run: bun run build  # must produce ./dist
+
+      - name: Prepare SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${REMOTE_HOST}" >> ~/.ssh/known_hosts
+
+      - name: Upload release and switch "current"
+        run: |
+          TS=$(date +%Y%m%d%H%M%S)
+          ssh -i ~/.ssh/id_ed25519 ${REMOTE_USER}@${REMOTE_HOST} "mkdir -p ${REMOTE_PATH}/releases/${TS}"
+          rsync -az --delete -e "ssh -i ~/.ssh/id_ed25519" ./dist/ ${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_PATH}/releases/${TS}/
+          ssh -i ~/.ssh/id_ed25519 ${REMOTE_USER}@${REMOTE_HOST} "ln -sfn ${REMOTE_PATH}/releases/${TS} ${REMOTE_PATH}/current && echo 'Deployed ${TS}'"
