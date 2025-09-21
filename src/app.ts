@@ -11,68 +11,71 @@ const info = {
   label: 'Keyboard + ADSR',
   needs: { time: true, fft: true },
   uiSections: [
-    { id: 'osc', label: 'Oscillator', color: '#16202a', enabledParam: 'osc.on' },
-    { id: 'filt', label: 'Filter', color: '#1f1426', enabledParam: 'filt.on' },
-    { id: 'lfo', label: 'LFO / Mod', color: '#1b2616', enabledParam: 'lfo.on' },
-    { id: 'env', label: 'Envelope', color: '#261c16', enabledParam: 'env.on' },
-    { id: 'fb', label: 'Feedback', color: '#262012', enabledParam: 'fb.on' },
-    { id: 'vis', label: 'Visuals', color: '#121a1a' },
-    { id: 'circle', label: 'Circle / Line', color: '#10121a' },
-    { id: 'boids', label: 'Boids', color: '#0f1410' },
+    { id: 'osc',    label: 'Oscillator',   color: '#16202a', enabledParam: 'osc.on' },
+    { id: 'filt',   label: 'Filter',       color: '#1f1426', enabledParam: 'filt.on' },
+    { id: 'lfo',    label: 'LFO / Mod',    color: '#1b2616', enabledParam: 'lfo.on' },
+    { id: 'env',    label: 'Envelope',     color: '#261c16', enabledParam: 'env.on' },
+    { id: 'fb',     label: 'Feedback',     color: '#262012', enabledParam: 'fb.on' },
+
+    // Visuals groups
+    { id: 'vis',    label: 'Visuals',      color: '#121a1a' },          // only mode + morph
+    { id: 'circle', label: 'Circle / Line',color: '#10121a' },          // circleLine-only
+    { id: 'boids',  label: 'Boids',        color: '#0f1410' },          // boids-only (gated by controls.ts)
+    { id: 'bugs',   label: 'Bugs',         color: '#0d1012' },          // bugs-only (gated by controls.ts)
   ],
 };
 
 const schema = {
   // toggles (one per section)
-  'osc.on': { kind: 'toggle', label: 'Enable', default: true, ui: { section: 'osc' } },
+  'osc.on':  { kind: 'toggle', label: 'Enable', default: true, ui: { section: 'osc' } },
   'filt.on': { kind: 'toggle', label: 'Enable', default: true, ui: { section: 'filt' } },
-  'lfo.on': { kind: 'toggle', label: 'Enable', default: true, ui: { section: 'lfo' } },
-  'env.on': { kind: 'toggle', label: 'Enable', default: true, ui: { section: 'env' } },
-  'fb.on': { kind: 'toggle', label: 'Enable', default: true, ui: { section: 'fb' } },
+  'lfo.on':  { kind: 'toggle', label: 'Enable', default: true, ui: { section: 'lfo' } },
+  'env.on':  { kind: 'toggle', label: 'Enable', default: true, ui: { section: 'env' } },
+  'fb.on':   { kind: 'toggle', label: 'Enable', default: true, ui: { section: 'fb' } },
 
   // Osc
-  'osc.type': { kind: 'enum', label: 'Wave', options: ['sine', 'square', 'triangle', 'sawtooth'] as const, default: 'sine', ui: { section: 'osc' } },
+  'osc.type': { kind: 'enum', label: 'Wave', options: ['sine','square','triangle','sawtooth'] as const, default: 'sine', ui: { section: 'osc' } },
 
   // Filter
   'filter.cutoff': { kind: 'number', label: 'LPF Cutoff', min: 100, max: 8000, step: 1, default: 2000, ui: { section: 'filt' } },
-  'filter.q': { kind: 'number', label: 'Resonance (Q)', min: 0.1, max: 20, step: 0.1, default: 1, ui: { section: 'filt' } },
+  'filter.q':      { kind: 'number', label: 'Resonance (Q)', min: 0.1, max: 20, step: 0.1, default: 1, ui: { section: 'filt' } },
 
   // LFO / Mod
-  'lfo.rate': { kind: 'number', label: 'LFO Rate (Hz)', min: 0.05, max: 15, step: 0.01, default: 2, ui: { section: 'lfo' } },
-  'mod.lfoToCutoff': { kind: 'number', label: 'LFO → Cutoff', min: 0, max: 4000, step: 1, default: 0, ui: { section: 'lfo' } },
+  'lfo.rate':        { kind: 'number', label: 'LFO Rate (Hz)', min: 0.05, max: 15, step: 0.01, default: 2, ui: { section: 'lfo' } },
+  'mod.lfoToCutoff': { kind: 'number', label: 'LFO → Cutoff',  min: 0, max: 4000, step: 1, default: 0, ui: { section: 'lfo' } },
 
   // Envelope
-  'env.attack': { kind: 'number', label: 'Attack (s)', min: 0, max: 2, step: 0.001, default: 0.01, ui: { section: 'env' } },
-  'env.decay': { kind: 'number', label: 'Decay (s)', min: 0, max: 2, step: 0.001, default: 0.10, ui: { section: 'env' } },
-  'env.sustain': { kind: 'number', label: 'Sustain', min: 0, max: 1, step: 0.001, default: 0.7, ui: { section: 'env' } },
-  'env.release': { kind: 'number', label: 'Release (s)', min: 0, max: 4, step: 0.001, default: 0.3, ui: { section: 'env' } },
+  'env.attack':  { kind: 'number', label: 'Attack (s)',  min: 0, max: 2, step: 0.001, default: 0.01, ui: { section: 'env' } },
+  'env.decay':   { kind: 'number', label: 'Decay (s)',   min: 0, max: 2, step: 0.001, default: 0.10, ui: { section: 'env' } },
+  'env.sustain': { kind: 'number', label: 'Sustain',     min: 0, max: 1, step: 0.001, default: 0.7,  ui: { section: 'env' } },
+  'env.release': { kind: 'number', label: 'Release (s)', min: 0, max: 4, step: 0.001, default: 0.3,  ui: { section: 'env' } },
 
   // Feedback (shared audio/visual)
-  'fb.time': { kind: 'number', label: 'FB Time (ms)', min: 1, max: 1000, step: 1, default: 240, ui: { section: 'fb' } },
-  'fb.length': { kind: 'number', label: 'FB Length', min: 0, max: 1, step: 0.01, default: 0.6, ui: { section: 'fb' } },
-  'fb.amount': { kind: 'number', label: 'FB Amount (mix)', min: 0, max: 1, step: 0.01, default: 0.25, ui: { section: 'fb' } },
+  'fb.time':   { kind: 'number', label: 'FB Time (ms)', min: 1, max: 1000, step: 1, default: 240, ui: { section: 'fb' } },
+  'fb.length': { kind: 'number', label: 'FB Length',    min: 0, max: 1,    step: 0.01, default: 0.6, ui: { section: 'fb' } },
+  'fb.amount': { kind: 'number', label: 'FB Amount',    min: 0, max: 1,    step: 0.01, default: 0.25, ui: { section: 'fb' } },
 
   // Visuals — ONLY mode/morph live here now
-  'vis.mode': { kind: 'enum', label: 'Visual Mode', options: ['circleLine', 'boids'] as const, default: 'boids', ui: { section: 'vis' } },
+  'vis.mode':    { kind: 'enum', label: 'Visual Mode', options: ['circleLine','boids'] as const, default: 'boids', ui: { section: 'vis' } },
   'morph.speed': { kind: 'number', label: 'Morph Speed (s)', min: 0.05, max: 5, step: 0.01, default: 1.5, ui: { section: 'vis' } },
 
-  // CircleLine-specific controls — moved here
-  'vis.blueGain': { kind: 'number', label: 'Blue Gain', min: 0, max: 4, step: 0.01, default: 1, ui: { section: 'circle' } },
+  // CircleLine-only
+  'vis.blueGain':  { kind: 'number', label: 'Blue Gain',  min: 0, max: 4, step: 0.01, default: 1, ui: { section: 'circle' } },
   'vis.whiteGain': { kind: 'number', label: 'White Gain', min: 0, max: 4, step: 0.01, default: 1, ui: { section: 'circle' } },
-  'vis.shape': { kind: 'number', label: 'Shape (Line↔Ring)', min: 0, max: 1, step: 0.001, default: 1, ui: { section: 'circle' } },
+  'vis.shape':     { kind: 'number', label: 'Shape (Line↔Ring)', min: 0, max: 1, step: 0.001, default: 1, ui: { section: 'circle' } },
 
-  // Boids-specific controls (you already have kAtk here)
-  'boids.kAtk': { kind: 'number', label: 'Attack → Separation', min: 0, max: 20, step: 0.1, default: 10, ui: { section: 'boids' } },
-  'boids.attrDistMul': { kind: 'number', label: 'Attract Distance ×R', min: 0.5, max: 6, step: 0.1, default: 3, ui: { section: 'boids' } },
-  'boids.attrStrength': { kind: 'number', label: 'Attract Strength', min: 0, max: 600, step: 1, default: 180, ui: { section: 'boids' } },
-  'boids.showSphere': { kind: 'toggle', label: 'Show Attractor Area', default: true, ui: { section: 'boids' } },
-  'boids.bugCount': { kind: 'number', label: 'Bug Count', min: 1, max: 30, step: 1, default: 6, ui: { section: 'boids' } },
-  'boids.bugTightness': { kind: 'number', label: 'Bug Tightness', min: 0, max: 1, step: 0.01, default: 0.5, ui: { section: 'boids' } },
-  // how strongly boids “lock on” to bugs while a note is held
-  'boids.bugFocus': { kind: 'number', label: 'Bug Focus', min: 0, max: 3, step: 0.05, default: 1.2, ui: { section: 'boids' } },
-  'boids.streamSpeed': { kind: 'number', label: 'Bug Stream Speed', min: 0, max: 300, step: 1, default: 55, ui: { section: 'boids' } },
-  'boids.turnGain': { kind: 'number', label: 'Bug Turn Gain', min: 0, max: 6, step: 0.05, default: 2.5, ui: { section: 'boids' } },
+  // Boids-only (flock behavior knobs)
+  'boids.kAtk':         { kind: 'number', label: 'Attack → Separation', min: 0, max: 20, step: 0.1, default: 10, ui: { section: 'boids' } },
+  'boids.attrDistMul':  { kind: 'number', label: 'Attract Distance ×R', min: 0.5, max: 6, step: 0.1, default: 3, ui: { section: 'boids' } },
+  'boids.attrStrength': { kind: 'number', label: 'Attract Strength',    min: 0, max: 600, step: 1,   default: 180, ui: { section: 'boids' } },
+  'boids.showSphere':   { kind: 'toggle', label: 'Show Attractor Area', default: true, ui: { section: 'boids' } },
 
+  // Bugs-only (the “prey” swarm the boids chase)
+  'boids.bugCount':     { kind: 'number', label: 'Bug Count',       min: 1,  max: 30,  step: 1,    default: 6,   ui: { section: 'bugs' } },
+  'boids.bugTightness': { kind: 'number', label: 'Bug Tightness',   min: 0,  max: 1,   step: 0.01, default: 0.5, ui: { section: 'bugs' } },
+  'boids.bugFocus':     { kind: 'number', label: 'Bug Focus',       min: 0,  max: 3,   step: 0.05, default: 1.2, ui: { section: 'bugs' } },
+  'boids.streamSpeed':  { kind: 'number', label: 'Bug Stream Speed',min: 0,  max: 300, step: 1,    default: 55,  ui: { section: 'bugs' } },
+  'boids.turnGain':     { kind: 'number', label: 'Bug Turn Gain',   min: 0,  max: 6,   step: 0.05, default: 2.5, ui: { section: 'bugs' } },
 
 } as const;
 
@@ -167,10 +170,10 @@ const audio = {
         if (!envOn) {
           env.A = 0; env.D = 0; env.S = 1; env.R = 0;
         } else {
-          if (typeof params['env.attack'] === 'number') env.A = Math.max(0, params['env.attack'] as number);
-          if (typeof params['env.decay'] === 'number') env.D = Math.max(0, params['env.decay'] as number);
-          if (typeof params['env.sustain'] === 'number') env.S = Math.min(1, Math.max(0, params['env.sustain'] as number));
-          if (typeof params['env.release'] === 'number') env.R = Math.max(0, params['env.release'] as number);
+          if (typeof params['env.attack'] === 'number')   env.A = Math.max(0, params['env.attack'] as number);
+          if (typeof params['env.decay'] === 'number')    env.D = Math.max(0, params['env.decay'] as number);
+          if (typeof params['env.sustain'] === 'number')  env.S = Math.min(1, Math.max(0, params['env.sustain'] as number));
+          if (typeof params['env.release'] === 'number')  env.R = Math.max(0, params['env.release'] as number);
         }
       },
 
@@ -183,7 +186,7 @@ const audio = {
   },
 };
 
-// ---- Visual now delegates to VisualEngine (modular controllers) ----
+// Visual
 const visual: VisualEffect = makeVisualEffect();
 
 export default { info, schema, audio, visual } satisfies EffectModule;
