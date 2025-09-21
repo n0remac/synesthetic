@@ -8,7 +8,10 @@ const canvasEl = document.getElementById('view') as HTMLCanvasElement
 const controlsForm = document.getElementById('controls') as HTMLFormElement
 
 // Worker & engine state
-const worker = new Worker('/src/engine/visual.worker.ts', { type: 'module' })
+const worker = new Worker(
+  new URL('./engine/visual.worker.ts', import.meta.url),
+  { type: 'module' }
+);
 const engine = new AudioEngine()
 let params: EffectParams = {}
 let ticking = false

@@ -33,8 +33,8 @@ function parseQSValue(
   if (def.kind === 'toggle') {
     const s = raw.trim().toLowerCase();
     // accept: 1/0, true/false, on/off, yes/no
-    if (['1','true','on','yes'].includes(s)) return true;
-    if (['0','false','off','no'].includes(s)) return false;
+    if (['1', 'true', 'on', 'yes'].includes(s)) return true;
+    if (['0', 'false', 'off', 'no'].includes(s)) return false;
     return undefined;
   }
   return undefined;
@@ -90,15 +90,12 @@ export function buildControls(
     return result;
   })();
 
-  const currentMode =
-    (qs.get('vis.mode') as string)
-    ?? (document.querySelector('[name="vis.mode"]') as HTMLSelectElement | null)?.value
-    ?? ((schema['vis.mode'] as any)?.default ?? 'circleLine');
+  const currentMode = String(defaults['vis.mode'] ?? 'boids');
 
   const sectionModeFromId = (id: string): 'boids' | 'circleLine' | null => {
     if (id === 'boids' || id === 'bugs') return 'boids';
-    if (id === 'circleLine') return 'circleLine';
-    return null; // always-visible sections
+    if (id === 'circle') return 'circleLine';
+    return null;
   };
 
   const gateByMode = (secId: string) => {
@@ -234,7 +231,12 @@ export function buildControls(
           // If vis.mode changes, a simple way to re-gate sections: rebuild the form
           if (key === 'vis.mode') {
             // Rebuild with the same external onChange
+            const url = new URL(window.location.href);
+            url.searchParams.set('vis.mode', select.value);
+            history.replaceState(null, '', url);
+
             buildControls(schema, onChange, sectionsMeta);
+            return;
           }
         };
         row.appendChild(select);
