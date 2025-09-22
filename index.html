@@ -43,6 +43,7 @@
 
     .panel {
       padding: 12px;
+      padding-top: 0px;
       overflow: auto;
       background: #121212;
       border-left: 1px solid #222;
@@ -377,7 +378,13 @@
   <div class="wrap">
     <canvas id="view" width="1280" height="720"></canvas>
     <div class="panel">
-      <header>
+      <header style="display:flex; flex-direction:column; gap:8px;">
+        <nav style="display:flex; gap:8px;">
+          <a href="/about.html"
+            style="background:#141414; border:1px solid #2a2a2a; padding:6px 10px; border-radius:8px; color:#eee; text-decoration:none;">
+            About & Favorites
+          </a>
+        </nav>
         <h2>Be careful if using headphones!</h2>
       </header>
       <form id="controls" class="panel"></form>

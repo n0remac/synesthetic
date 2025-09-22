@@ -11,7 +11,7 @@ const info = {
   label: 'Keyboard + ADSR',
   needs: { time: true, fft: true },
   uiSections: [
-    { id: 'osc', label: 'Oscillator', color: '#16202a', enabledParam: 'osc.on' },
+    { id: 'osc', label: 'Oscillator', color: '#16202a', enabledParam: '' },
     { id: 'filt', label: 'Filter', color: '#1f1426', enabledParam: 'filt.on' },
     { id: 'lfo', label: 'LFO / Mod', color: '#1b2616', enabledParam: 'lfo.on' },
     { id: 'env', label: 'Envelope', color: '#261c16', enabledParam: 'env.on' },
@@ -69,7 +69,7 @@ const schema = {
   'boids.kAtk': { kind: 'number', label: 'Attack → Separation', min: 0, max: 20, step: 0.1, default: 5, ui: { section: 'boids' } },
   'boids.attrDistMul': { kind: 'number', label: 'Attract Distance ×R', min: 0.5, max: 6, step: 0.1, default: 6, ui: { section: 'boids' } },
   'boids.attrStrength': { kind: 'number', label: 'Attract Strength', min: 0, max: 600, step: 1, default: 600, ui: { section: 'boids' } },
-  'boids.maxSpeed': { kind: 'number', label: 'Max Speed', min: 40, max: 400, step: 1, default: 115, ui: { section: 'boids' } },
+  'boids.maxSpeed': { kind: 'number', label: 'Max Speed', min: 40, max: 400, step: 1, default: 180, ui: { section: 'boids' } },
   'boids.neighborR': { kind: 'number', label: 'Neighbor Radius', min: 20, max: 200, step: 1, default: 70, ui: { section: 'boids' } },
 
   // Bugs-only (the “prey” swarm the boids chase)

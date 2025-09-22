@@ -113,22 +113,33 @@ export function buildControls(
   saveBtn.textContent = 'Copy link';
   saveBtn.onclick = async (e) => {
     e.preventDefault();
+
     const url = new URL(window.location.href);
     const params = new URLSearchParams();
-    // Only include params that differ from schema defaults — cleaner links
-    for (const [key, def] of Object.entries(schema)) {
-      const val = current[key];
-      const dflt = (def as any).default;
-      if (val === dflt) continue;
 
-      if (typeof val === 'boolean') params.set(key, val ? 'true' : 'false');
-      else params.set(key, String(val));
+    // 1) Write ALL control params from current state (fallback to defaults if missing)
+    //    (Optional) stable key order for nicer diffs:
+    const keys = Object.keys(schema).sort();
+
+    for (const key of keys) {
+      const def = (schema as any)[key];
+      const val = (current[key] ?? def.default);
+
+      if (typeof val === 'boolean') {
+        params.set(key, val ? 'true' : 'false');
+      } else {
+        // Normalize numbers minimally; keep strings/enums as-is
+        const out =
+          typeof val === 'number' && Number.isFinite(val) ? String(val) : String(val ?? '');
+        params.set(key, out);
+      }
     }
-    // keep any non-control params that were already in the URL
+
+    // 2) Preserve any non-control params already present in the URL
     for (const [k, v] of qs.entries()) {
-      if (schema[k as keyof ParamSchema]) continue; // skip control keys we just set above
-      params.set(k, v);
+      if (!(k in schema)) params.set(k, v);
     }
+
     url.search = params.toString();
 
     const link = url.toString();
@@ -137,10 +148,10 @@ export function buildControls(
       saveBtn.textContent = 'Copied!';
       setTimeout(() => (saveBtn.textContent = 'Copy link'), 1000);
     } catch {
-      // fallback: open prompt
       window.prompt('Copy this link', link);
     }
   };
+
   saveRow.appendChild(saveLabel);
   saveRow.appendChild(saveBtn);
   form.appendChild(saveRow);
