@@ -11,6 +11,8 @@ const info = {
   label: 'Keyboard + ADSR',
   needs: { time: true, fft: true },
   uiSections: [
+    { id: 'vis', label: 'Visuals', color: '#121a1a' },          // only mode + morph
+    
     { id: 'osc', label: 'Oscillator', color: '#16202a', enabledParam: '' },
     { id: 'filt', label: 'Filter', color: '#1f1426', enabledParam: 'filt.on' },
     { id: 'lfo', label: 'LFO / Mod', color: '#1b2616', enabledParam: 'lfo.on' },
@@ -18,7 +20,6 @@ const info = {
     { id: 'fb', label: 'Feedback', color: '#262012', enabledParam: 'fb.on' },
 
     // Visuals groups
-    { id: 'vis', label: 'Visuals', color: '#121a1a' },          // only mode + morph
     { id: 'circle', label: 'Circle / Line', color: '#10121a' },          // circleLine-only
     { id: 'boids', label: 'Boids', color: '#0f1410' },          // boids-only (gated by controls.ts)
     { id: 'bugs', label: 'Bugs', color: '#0d1012' },          // bugs-only (gated by controls.ts)
