@@ -2,7 +2,7 @@
   "lockfileVersion": 1,
   "workspaces": {
     "": {
-      "name": "av-mini-synth",
+      "name": "synesthetic",
       "devDependencies": {
         "vite": "^7.1.6",
       },
