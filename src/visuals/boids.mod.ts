@@ -104,16 +104,40 @@ export class Boids extends BaseController {
   }
 
   private ensureBoids() {
-    if (this.inited && this.boids.length === this.count) return
-    this.boids = new Array(this.count).fill(0).map(() => {
-      const x = this.rand01() * this.w
-      const y = this.rand01() * this.h
-      const a = this.rand01() * Math.PI * 2
-      const s = this.maxSpeed * (0.25 + 0.25 * this.rand01())
-      return { x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s }
-    })
-    this.inited = true
+    const desired = this.count | 0;
+    const cur = this.boids.length;
+
+    if (!this.inited) {
+      // first init
+      this.boids = new Array(desired).fill(0).map(() => {
+        const x = this.rand01() * this.w;
+        const y = this.rand01() * this.h;
+        const a = this.rand01() * Math.PI * 2;
+        const s = this.maxSpeed * (0.25 + 0.25 * this.rand01());
+        return { x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s };
+      });
+      this.inited = true;
+      return;
+    }
+
+    if (desired > cur) {
+      // add new boids near the stream center so they blend in
+      const add = desired - cur;
+      for (let i = 0; i < add; i++) {
+        const jitterR = (this.stream.radius * 0.5) * this.rand01();
+        const ang = this.rand01() * Math.PI * 2;
+        const x = this.stream.x + Math.cos(ang) * jitterR;
+        const y = this.stream.y + Math.sin(ang) * jitterR;
+        const dir = this.rand01() * Math.PI * 2;
+        const s = this.maxSpeed * (0.25 + 0.25 * this.rand01());
+        this.boids.push({ x, y, vx: Math.cos(dir) * s, vy: Math.sin(dir) * s });
+      }
+    } else if (desired < cur) {
+      // remove a few from the end (cheap)
+      this.boids.length = desired;
+    }
   }
+
 
   private computeEnvelope(time?: Uint8Array, dt?: number) {
     if (!time || !time.length) {
