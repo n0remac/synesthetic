@@ -11,7 +11,7 @@ export class AudioEngine {
     constructor() {
         this.ctx = new AudioContext()
         this.master = new GainNode(this.ctx, { gain: 1 })
-        this.analyser = new AnalyserNode(this.ctx, { fftSize: 1024, smoothingTimeConstant: 0.5 })
+        this.analyser = new AnalyserNode(this.ctx, { fftSize: 2048, smoothingTimeConstant: 0.0 })
         this.master.connect(this.ctx.destination)
         this.master.connect(this.analyser)
     }

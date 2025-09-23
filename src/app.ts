@@ -12,7 +12,7 @@ const info = {
   needs: { time: true, fft: true },
   uiSections: [
     { id: 'vis', label: 'Visuals', color: '#121a1a' },          // only mode + morph
-    
+
     { id: 'osc', label: 'Oscillator', color: '#16202a', enabledParam: '' },
     { id: 'filt', label: 'Filter', color: '#1f1426', enabledParam: 'filt.on' },
     { id: 'lfo', label: 'LFO / Mod', color: '#1b2616', enabledParam: 'lfo.on' },
@@ -62,8 +62,9 @@ const schema = {
 
   // CircleLine-only
   'vis.blueGain': { kind: 'number', label: 'Blue Gain', min: 0, max: 4, step: 0.01, default: 1, ui: { section: 'circle' } },
-  'vis.whiteGain': { kind: 'number', label: 'White Gain', min: 0, max: 4, step: 0.01, default: 1, ui: { section: 'circle' } },
+  'vis.whiteGain': { kind: 'number', label: 'White Gain', min: 0, max: 8, step: 0.01, default: 1, ui: { section: 'circle' } },
   'vis.shape': { kind: 'number', label: 'Shape (Line↔Ring)', min: 0, max: 1, step: 0.001, default: 1, ui: { section: 'circle' } },
+  'vis.angleDeg': { kind: 'number', label: 'Ring Rotation (°)', min: -180, max: 180, step: 0.5, default: 180, ui: { section: 'circle'}},
 
   // Boids-only (flock behavior knobs)
   'boids.count': { kind: 'number', label: 'Boid Count', min: 50, max: 1000, step: 10, default: 200, ui: { section: 'boids' } },
