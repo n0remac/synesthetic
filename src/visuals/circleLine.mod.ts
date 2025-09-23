@@ -130,10 +130,10 @@ export class CircleLine extends BaseController {
     };
 
     // Single continuous path (no halves) — FFT & generic use
-    const drawMorphPath = ({
-      N, sampleAt, ringBaseR, ringScale, lineY, stroke, width, closeRing = false,
-      angleOffsetRad: angleOff = 0,   // NEW
-    }: {
+    // helpers already defined above:
+    // const ANGLE0 = -Math.PI/2, const TAU = Math.PI*2, wrapAngle(), xFromT(), archK, lerp, shape
+
+    type DrawerArgs = {
       N: number;
       sampleAt: (i: number) => number;
       ringBaseR: number;
@@ -141,36 +141,71 @@ export class CircleLine extends BaseController {
       lineY: number;
       stroke: string;
       width: number;
-      closeRing?: boolean;
-      angleOffsetRad?: number;        // NEW
-    }) => {
+      angleOffsetRad?: number;  // ring rotation in radians
+      phase01?: number;         // extra ring phase (0..1), e.g. time-domain seam align
+    };
+
+    const drawMorphPath = ({
+      N, sampleAt, ringBaseR, ringScale, lineY, stroke, width,
+      angleOffsetRad = 0,
+      phase01 = 0,
+    }: DrawerArgs) => {
       ctx.strokeStyle = stroke;
       ctx.lineWidth = width;
-      ctx.beginPath();
 
-      for (let i = 0; i < N; i++) {
-        const tNorm = i / (N - 1);
-        // NEW: add angle offset to ring angle
-        const ang = wrapAngle(ANGLE0 + tNorm * TAU + angleOff);
+      if (shape < 0.999) {
+        // LINE MODE — keep the old two-halves mapping so the "blue bar" grows/animates correctly.
+        const halves: Array<{ i0: number; i1: number }> = [
+          { i0: 0, i1: Math.floor(N / 2) },
+          { i0: Math.floor(N / 2), i1: N - 1 },
+        ];
+        for (const { i0, i1 } of halves) {
+          ctx.beginPath();
+          const dir = i1 >= i0 ? 1 : -1;
+          for (let i = i0; dir > 0 ? i <= i1 : i >= i1; i += dir) {
+            const tLine = (i - i0) / (i1 - i0 || 1);    // x for the straight bar (old behavior)
+            const tRing = i / (N - 1);                  // ring parameter (for morph only)
+            const a = sampleAt(i);
 
-        const a = sampleAt(i);
+            // Ring side (only shows when shape>0)
+            const ang = wrapAngle(ANGLE0 + ((tRing + phase01) % 1) * TAU + angleOffsetRad);
+            const rRing = ringBaseR + a * ringScale;
+            const xRing = cx + Math.cos(ang) * rRing;
+            const yRing = cy + Math.sin(ang) * rRing;
 
-        const rRing = ringBaseR + a * ringScale;
-        const xRing = cx + Math.cos(ang) * rRing;
-        const yRing = cy + Math.sin(ang) * rRing;
+            // Line side (dominates when shape≈0)
+            const xLine = xFromT(tLine);
+            const arch = archK * Math.cos(tLine * Math.PI);
+            const yLine = lineY + a * ringScale * 0.25 + arch;
 
-        const xLine = xFromT(tNorm);
-        const arch = archK * Math.cos(tNorm * Math.PI);
-        const yLine = lineY + a * ringScale * 0.25 + arch;
+            const x = lerp(xLine, xRing, shape);
+            const y = lerp(yLine, yRing, shape);
+            if (i === i0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+        }
+      } else {
+        // RING MODE — single continuous path; skip 2π endpoint to avoid a seam chord.
+        ctx.beginPath();
+        for (let i = 0; i < N - 1; i++) {
+          const t = i / (N - 1);
+          const a = sampleAt(i);
 
-        const x = lerp(xLine, xRing, shape);
-        const y = lerp(yLine, yRing, shape);
+          const ang = wrapAngle(ANGLE0 + ((t + phase01) % 1) * TAU + angleOffsetRad);
+          const rRing = ringBaseR + a * ringScale;
+          const xRing = cx + Math.cos(ang) * rRing;
+          const yRing = cy + Math.sin(ang) * rRing;
 
-        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+          const xLine = xFromT(t);
+          const arch = archK * Math.cos(t * Math.PI);
+          const yLine = lineY + a * ringScale * 0.25 + arch;
+
+          const x = lerp(xLine, xRing, shape);
+          const y = lerp(yLine, yRing, shape);
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
       }
-
-      if (closeRing && shape > 0.999) ctx.closePath();
-      ctx.stroke();
     };
 
     // Blue (FFT)
@@ -178,9 +213,8 @@ export class CircleLine extends BaseController {
       const step = Math.max(1, Math.floor(this.freq.length / 128));
       const N = 128;
       const sampleAt = (i: number) => {
-        const freqLength = this.freq?.length ?? 0;
-        const idx = Math.min(freqLength - 1, i * step);
-        return (this.freq ? this.freq[idx] : 0) / 255 * blueGain;
+        const idx = Math.min((this.freq?.length ?? 0) - 1, i * step);
+        return ((this.freq ? this.freq[idx] : 0) / 255) * blueGain;
       };
 
       drawMorphPath({
@@ -188,14 +222,16 @@ export class CircleLine extends BaseController {
         ringBaseR: 130, ringScale: 140,
         lineY: cy - gap,
         stroke: 'hsl(200,80%,70%)', width: 2,
-        angleOffsetRad: angleOffsetRad,               // NEW
+        angleOffsetRad,        // rotates ring only
+        phase01: 0,            // no extra phase for FFT
       });
       drawMorphPath({
         N, sampleAt,
         ringBaseR: 130, ringScale: 140,
         lineY: cy + gap,
         stroke: 'hsl(200,80%,70%)', width: 2,
-        angleOffsetRad: angleOffsetRad,               // NEW
+        angleOffsetRad,
+        phase01: 0,
       });
     }
 
@@ -245,46 +281,22 @@ export class CircleLine extends BaseController {
       // phase-align ring by trigger & inter-frame correction
       const phaseOffset01 = ((startFrac - this.lastPhaseCorr) / N) % 1;
 
-      // Time-domain draw with angle offset support
-      const drawMorphPathTD = ({
-        N, sampleAt, ringBaseR, ringScale, lineY, stroke, width,
-        angleOffsetRad: angleOff = 0,    // NEW
-      }: any) => {
-        ctx.strokeStyle = stroke;
-        ctx.lineWidth = width;
-        ctx.beginPath();
-        for (let i = 0; i < N - 1; i++) { // skip 2π endpoint
-          const t01 = i / (N - 1);
-          // rotate by phase (seam align) + explicit angle offset
-          const ang = wrapAngle(ANGLE0 + ((t01 + phaseOffset01 + 1) % 1) * TAU + angleOff);
-
-          const a = sampleAt(i);
-
-          const rRing = ringBaseR + a * ringScale;
-          const xRing = cx + Math.cos(ang) * rRing;
-          const yRing = cy + Math.sin(ang) * rRing;
-
-          const xLine = xFromT(t01);
-          const arch = archK * Math.cos(t01 * Math.PI);
-          const yLine = lineY + a * ringScale * 0.25 + arch;
-
-          const x = lerp(xLine, xRing, shape);
-          const y = lerp(yLine, yRing, shape);
-          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-        }
-        ctx.stroke();
-      };
-
       // draw top/bottom once each (white)
-      drawMorphPathTD({
-        N, sampleAt, ringBaseR: 210, ringScale: 40,
-        lineY: cy - gap * 0.6, stroke: 'white', width: 1,
-        angleOffsetRad: angleOffsetRad,                 // NEW
+      drawMorphPath({
+        N, sampleAt: (i) => sampleFrac(this.time!, startFrac + i) * whiteGain * 2,
+        ringBaseR: 210, ringScale: 40,
+        lineY: cy - gap * 0.6,
+        stroke: 'white', width: 1,
+        angleOffsetRad,              // rotates ring
+        phase01: (phaseOffset01 + 1) % 1, // seam align
       });
-      drawMorphPathTD({
-        N, sampleAt, ringBaseR: 210, ringScale: 40,
-        lineY: cy + gap * 0.6, stroke: 'white', width: 1,
-        angleOffsetRad: angleOffsetRad,                 // NEW
+      drawMorphPath({
+        N, sampleAt: (i) => sampleFrac(this.time!, startFrac + i) * whiteGain * 2,
+        ringBaseR: 210, ringScale: 40,
+        lineY: cy + gap * 0.6,
+        stroke: 'white', width: 1,
+        angleOffsetRad,
+        phase01: (phaseOffset01 + 1) % 1,
       });
     }
   }
