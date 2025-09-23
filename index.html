@@ -236,21 +236,28 @@
       border-top: 1px solid #222;
       z-index: 10;
       display: none;
-      /* default hidden on desktop */
-      padding-bottom: env(safe-area-inset-bottom);
+      /* hidden by default on desktop */
+      padding: 8px 8px calc(8px + env(safe-area-inset-bottom)) 8px;
+
+      /* keep grid properties here; they'll apply when display becomes grid */
+      /* ⚠️ DO NOT set display:grid here */
+      grid-template-columns: var(--bookend-w, 56px) 1fr var(--bookend-w, 56px);
+      grid-template-rows: auto 1fr;
+      align-items: end;
+      gap: 6px 8px;
     }
 
     /* show piano on mobile by default */
     @media (max-width: 768px) {
       #piano {
-        display: block;
+        display: grid;
       }
     }
 
-    /* show piano on desktop when toggled */
+    /* show piano on desktop only when explicitly toggled */
     @media (min-width: 769px) {
       html.show-desktop-piano #piano {
-        display: block;
+        display: grid;
       }
 
       html.show-desktop-piano .wrap {
@@ -263,9 +270,58 @@
       }
     }
 
-    /* layers */
-    #piano .white-keys,
-    #piano .black-keys {
+
+    /* NEW: indicator row spans all three columns, sits just above the keys */
+    #octave-indicator {
+      grid-column: 1 / 4;
+      grid-row: 1;
+      justify-self: center;
+      padding: 4px 8px;
+      border-radius: 8px;
+      background: #141414;
+      border: 1px solid #2a2a2a;
+      color: #ddd;
+      font-size: 12px;
+    }
+
+    .octave-button {
+      grid-row: 2;
+      align-self: stretch;
+      margin: 6px 0;
+      /* match .white-keys padding (6px top/bottom) */
+      border-radius: 6px;
+      border: 1px solid #b0b0b0;
+      border-bottom-color: #8b8b8b;
+      background: linear-gradient(#dcdcdc, #c8c8c8);
+      /* grey */
+      color: #222;
+      box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .12);
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      font-size: 12px;
+      user-select: none;
+      touch-action: none;
+      pointer-events: auto;
+    }
+
+    .octave-button:active {
+      background: linear-gradient(#d2d2d2, #bfbfbf);
+      box-shadow: inset 0 -1px 0 rgba(0, 0, 0, .18);
+      transform: translateY(1px);
+    }
+
+    /* NEW: keys live in middle column, row 2, inside a positioned stage */
+    .piano-stage {
+      grid-column: 2;
+      grid-row: 2;
+      position: relative;
+      height: 100%;
+    }
+
+    /* layers inside the stage */
+    .piano-stage .white-keys,
+    .piano-stage .black-keys {
       position: absolute;
       left: 0;
       right: 0;
@@ -273,24 +329,22 @@
       /* let keys handle events */
     }
 
-    #piano .white-keys {
+    .piano-stage .white-keys {
       top: 0;
       bottom: 0;
       display: grid;
       grid-template-columns: repeat(7, 1fr);
       gap: 2px;
-      padding: 6px 8px calc(6px + env(safe-area-inset-bottom)) 8px;
+      padding: 6px 0;
     }
 
-    #piano .black-keys {
+    .piano-stage .black-keys {
       top: 0;
       height: 70%;
     }
 
-    /* black keys shorter */
-
     /* white keys */
-    #piano .white {
+    .piano-stage .white {
       all: unset;
       pointer-events: auto;
       background: linear-gradient(#fff, #e9e9e9);
@@ -307,19 +361,18 @@
       touch-action: none;
     }
 
-    #piano .white.active {
+    .piano-stage .white.active {
       background: linear-gradient(#f2f2f2, #dcdcdc);
       box-shadow: inset 0 -1px 0 rgba(0, 0, 0, .2);
       transform: translateY(1px);
     }
 
     /* black keys */
-    #piano .black {
+    .piano-stage .black {
       all: unset;
       pointer-events: auto;
       position: absolute;
       top: 6px;
-      /* width is 60% of a white key’s width */
       width: calc((100% / 7) * 0.6);
       left: calc((var(--pos) + 1) * (100% / 7) - ((100% / 7) * 0.3));
       height: calc(70% - 8px);
@@ -336,11 +389,12 @@
       touch-action: none;
     }
 
-    #piano .black.active {
+    .piano-stage .black.active {
       background: linear-gradient(#1b1b1b, #0e0e0e);
       box-shadow: 0 2px 0 rgba(0, 0, 0, .6), inset 0 -1px 0 rgba(255, 255, 255, .05);
       transform: translateY(1px);
     }
+
 
     /* audio unlock button (mobile only) */
     @media (max-width: 768px) {
@@ -391,34 +445,47 @@
     </div>
   </div>
   <script type="module" src="/src/client.ts"></script>
-  <!-- Mobile piano (7 white keys + 5 black keys) -->
+
+
   <div id="piano" aria-label="Piano keys (mobile)">
-    <div class="white-keys">
-      <button class="white" data-code="KeyA" aria-label="C"></button>
-      <button class="white" data-code="KeyS" aria-label="D"></button>
-      <button class="white" data-code="KeyD" aria-label="E"></button>
-      <button class="white" data-code="KeyF" aria-label="F"></button>
-      <button class="white" data-code="KeyG" aria-label="G"></button>
-      <button class="white" data-code="KeyH" aria-label="A"></button>
-      <button class="white" data-code="KeyJ" aria-label="B"></button>
+    <!-- indicator above the keys -->
+    <div id="octave-indicator" aria-live="polite">Oct 0</div>
+
+    <!-- left bookend -->
+    <button id="octave-left" class="octave-button" type="button" aria-label="Octave Down">-</button>
+
+    <!-- middle keys area -->
+    <div class="piano-stage">
+      <div class="white-keys">
+        <button class="white" data-code="KeyA" aria-label="C"></button>
+        <button class="white" data-code="KeyS" aria-label="D"></button>
+        <button class="white" data-code="KeyD" aria-label="E"></button>
+        <button class="white" data-code="KeyF" aria-label="F"></button>
+        <button class="white" data-code="KeyG" aria-label="G"></button>
+        <button class="white" data-code="KeyH" aria-label="A"></button>
+        <button class="white" data-code="KeyJ" aria-label="B"></button>
+      </div>
+
+      <div class="black-keys">
+        <button class="black" style="--pos:0" data-code="KeyW" aria-label="C sharp"></button>
+        <button class="black" style="--pos:1" data-code="KeyE" aria-label="D sharp"></button>
+        <!-- (no black key between E and F) -->
+        <button class="black" style="--pos:3" data-code="KeyT" aria-label="F sharp"></button>
+        <button class="black" style="--pos:4" data-code="KeyY" aria-label="G sharp"></button>
+        <button class="black" style="--pos:5" data-code="KeyU" aria-label="A sharp"></button>
+      </div>
     </div>
 
-    <!-- Black keys are positioned between whites using --pos (0..5 with 2 skipped) -->
-    <div class="black-keys">
-      <button class="black" style="--pos:0" data-code="KeyW" aria-label="C sharp"></button>
-      <button class="black" style="--pos:1" data-code="KeyE" aria-label="D sharp"></button>
-      <!-- (no black key between E and F) -->
-      <button class="black" style="--pos:3" data-code="KeyT" aria-label="F sharp"></button>
-      <button class="black" style="--pos:4" data-code="KeyY" aria-label="G sharp"></button>
-      <button class="black" style="--pos:5" data-code="KeyU" aria-label="A sharp"></button>
-    </div>
+    <!-- right bookend -->
+    <button id="octave-right" class="octave-button" type="button" aria-label="Octave Up">+</button>
   </div>
+
 
   <!-- Desktop keyboard help -->
   <div id="desktop-help" role="region" aria-label="Keyboard help (desktop)">
     <div class="msg">
       Tip: play notes with your computer keyboard — A S D F G H J for white keys and
-      W E T Y U for black keys.
+      W E T Y U for black keys. Use 1 and 2 to change octaves.
     </div>
     <div class="actions">
       <label class="dontshow">

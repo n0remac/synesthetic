@@ -1,8 +1,16 @@
-import { CODE_TO_MIDI } from "../util/notes";
+// src/input/keyboard.ts
+import {
+  codeToMidi,
+  OCTAVE_DOWN_CODES, OCTAVE_UP_CODES,
+  incOctave, decOctave,
+  getOctaveOffset
+} from "../util/notes";
 
 export type KeyboardHandlers = {
   onDown: (code: string) => void;
   onUp: (code: string) => void;
+  // Optional hooks to reflect octave changes in UI
+  onOctaveChange?: (oct: number) => void;
 };
 
 function isTextEditable(el: EventTarget | null) {
@@ -11,12 +19,12 @@ function isTextEditable(el: EventTarget | null) {
   if (tag === "textarea" || el.isContentEditable) return true;
   if (tag === "input") {
     const type = (el.getAttribute("type") || "").toLowerCase();
-    return ["text","search","email","url","number","password","tel"].includes(type);
+    return ["text", "search", "email", "url", "number", "password", "tel"].includes(type);
   }
   return false;
 }
 
-export function attachKeyboard({ onDown, onUp }: KeyboardHandlers) {
+export function attachKeyboard({ onDown, onUp, onOctaveChange }: KeyboardHandlers) {
   const down = new Set<string>();
 
   const allUp = () => { for (const c of Array.from(down)) { onUp(c); } down.clear(); };
@@ -24,7 +32,28 @@ export function attachKeyboard({ onDown, onUp }: KeyboardHandlers) {
   const keydown = (ev: KeyboardEvent) => {
     if (isTextEditable(ev.target)) return;
     const code = ev.code;
-    if (!(code in CODE_TO_MIDI) || ev.repeat) return;
+
+    if (OCTAVE_DOWN_CODES.has(code)) {
+      ev.preventDefault();
+      if (!down.has(code)) {
+        down.add(code);
+        decOctave();
+        onOctaveChange?.(getOctaveOffset());
+      }
+      return;
+    }
+    if (OCTAVE_UP_CODES.has(code)) {
+      ev.preventDefault();
+      if (!down.has(code)) {
+        down.add(code);
+        incOctave();
+        onOctaveChange?.(getOctaveOffset());
+      }
+      return;
+    }
+
+    const midi = codeToMidi(code);
+    if (midi === undefined || ev.repeat) return;
     ev.preventDefault();
     if (down.has(code)) return;
     down.add(code);
@@ -33,7 +62,16 @@ export function attachKeyboard({ onDown, onUp }: KeyboardHandlers) {
 
   const keyup = (ev: KeyboardEvent) => {
     const code = ev.code;
-    if (!(code in CODE_TO_MIDI)) return;
+
+    if (OCTAVE_DOWN_CODES.has(code) || OCTAVE_UP_CODES.has(code)) {
+      ev.preventDefault();
+      if (!down.has(code)) return;
+      down.delete(code);
+      return;
+    }
+
+    const midi = codeToMidi(code);
+    if (midi === undefined) return;
     ev.preventDefault();
     if (!down.has(code)) return;
     down.delete(code);

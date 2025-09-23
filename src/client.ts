@@ -3,9 +3,9 @@ import { buildControls } from './ui/controls'
 import type { EffectParams, MsgToWorker } from './engine/protocol'
 import { AudioEngine } from './engine/audio'
 import effectModule from './app' // your main (audio+schema) module — main thread ONLY
+import { initPianoOctaveUI } from './ui/pianoOctaveUI';
 
 const canvasEl = document.getElementById('view') as HTMLCanvasElement
-const controlsForm = document.getElementById('controls') as HTMLFormElement
 
 // Worker & engine state
 const worker = new Worker(
@@ -334,6 +334,12 @@ function startApp() {
   mountDesktopPianoToggleIntoControls();
   initDesktopHelp();
   if (!ticking) { ticking = true; tick(); }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => initPianoOctaveUI());
+} else {
+  initPianoOctaveUI();
 }
 
 
