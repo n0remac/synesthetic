@@ -7,7 +7,6 @@ import { NoteHub } from './engine/input/noteHub';
 import { attachKeyboardToHub } from './audio/io/keyboardSource';
 import { makeVisualEffect } from './engine/visualEngine';
 import { ArpFromHub, type NoteGate } from './audio/dsp/seq/arpHub';
-import { stepLengthSec } from './audio/dsp/seq/arpCommon'; // optional if you need it elsewhere
 
 
 // ---------- Effect metadata & UI sections ----------
