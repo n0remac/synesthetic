@@ -1,43 +1,47 @@
+// envelope.ts
 export type ADSR = { A: number; D: number; S: number; R: number };
 export const defaultADSR: ADSR = { A: 0.01, D: 0.10, S: 0.7, R: 0.3 };
 
-// Tiny de-click guards (seconds)
-const MIN_A = 0.003;   // >= ~3 ms
-const MIN_D = 0.003;   // >= ~3 ms
-const MIN_R = 0.010;   // >= ~10 ms
+// Minimum stage times (s)
+const MIN_A = 0.003;
+const MIN_D = 0.003;
+const MIN_R = 0.015;
 
-// Small non-zero floor to avoid "snap to absolute zero"
+// Non-zero floors (avoid exact zero steps)
 const FLOOR = 0.0005;
+const START_FLOOR = 0.001;
 
-/**
- * Attack/Decay from the *current* gain value, with tiny minimum times.
- * Uses cancelAndHoldAtTime so there is no step when re-scheduling quickly.
- */
+// Cancel slightly before t0 so we never “snap to a future event”
+const EPS = 1e-4;
+
 export function scheduleAttackDecay(env: GainNode, t0: number, { A, D, S }: ADSR) {
   const a = Math.max(MIN_A, A);
   const d = Math.max(MIN_D, D);
   const s = Math.min(1, Math.max(0, S));
 
   const p = env.gain;
-  // hold the current trajectory/value at t0, then continue smoothly
-  p.cancelAndHoldAtTime(t0);
-  p.setValueAtTime(p.value, t0);
+  try { p.cancelAndHoldAtTime(Math.max(0, t0 - EPS)); } catch { }
 
-  // Fast & click-safe linear ramps for envelope stages
-  p.linearRampToValueAtTime(1.0, t0 + a);
-  p.linearRampToValueAtTime(s,   t0 + a + d);
+  const start = Math.max(START_FLOOR, p.value);
+  p.setValueAtTime(start, t0);
+
+  // Exponential-ish ramps (smoother near zero than linear)
+  p.setTargetAtTime(1.0, t0, a / 4);
+  p.setTargetAtTime(Math.max(FLOOR, s), t0 + a, d / 4);
 }
 
-/**
- * Release from the *current* gain value down to a tiny floor (not hard zero).
- */
 export function scheduleRelease(env: GainNode, t0: number, { R }: ADSR) {
   const r = Math.max(MIN_R, R);
-
   const p = env.gain;
-  p.cancelAndHoldAtTime(t0);
-  p.setValueAtTime(p.value, t0);
 
-  // Linear down to a small floor to avoid zero snap (and denormals)
-  p.linearRampToValueAtTime(FLOOR, t0 + r);
+  try { p.cancelAndHoldAtTime(Math.max(0, t0 - EPS)); } catch { }
+
+  const cur = Math.max(FLOOR, p.value);
+  p.setValueAtTime(cur, t0);
+
+  // Smoothly head to a tiny floor; no jump to 0 at the end.
+  p.setTargetAtTime(FLOOR, t0, r / 4);
+
+  // OPTIONAL (very late tidy-up, far away so it’s inaudible and always canceled by next note):
+  // p.setTargetAtTime(0, t0 + Math.max(0.75, 4 * r), (4 * r));
 }

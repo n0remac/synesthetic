@@ -34,13 +34,25 @@ export function createVoicePool(ctx: AudioContext, target: AudioNode): VoicePool
   }
 
   function safeRelease(env: GainNode, t0: number) {
-    // Gentle release then a hard floor to guarantee silence.
-    try {
-      env.gain.cancelAndHoldAtTime(t0);
-    } catch {}
-    env.gain.setTargetAtTime(0, t0, 0.02);
-    // hard zero (prevents asymptotic tails or lost events from hanging)
-    env.gain.setValueAtTime(0, t0 + 0.25);
+    const p = env.gain;
+    const FLOOR = 0.0005;
+    try { p.cancelAndHoldAtTime(Math.max(0, t0 - 1e-4)); } catch { }
+    // head smoothly to a tiny floor; do NOT jump to 0 soon after
+    p.setValueAtTime(Math.max(FLOOR, p.value), t0);
+    p.setTargetAtTime(FLOOR, t0, 0.02 / 4);
+    // very late tidy zero (far away so it’s inaudible; will be canceled by next noteOn)
+    p.setValueAtTime(0, t0 + 1.0);
+  }
+
+
+  function setFreqWithGlide(osc: OscillatorNode, hz: number, t0: number, glideSec = 0.003) {
+    const p = osc.frequency;
+    const EPS = 1e-4;
+
+    try { p.cancelAndHoldAtTime(Math.max(0, t0 - EPS)); } catch { }
+    // Start from “where we are” at t0, then glide to target
+    p.setValueAtTime(p.value, t0);
+    p.linearRampToValueAtTime(hz, t0 + Math.max(0.001, glideSec));
   }
 
   return {
@@ -54,10 +66,13 @@ export function createVoicePool(ctx: AudioContext, target: AudioNode): VoicePool
     noteOn(code, t0, attack) {
       const midi = codeToMidi(code);
       if (midi === undefined) return;
+
       let v = voicesByCode.get(code);
       if (!v) { v = createVoice(); voicesByCode.set(code, v); }
       v.down = true;
-      v.osc.frequency.setValueAtTime(midiToHz(midi), t0);
+
+      const hz = midiToHz(midi);
+      setFreqWithGlide(v.osc, hz, t0, 0.003);   // ~3ms glide
       attack(v.env, t0);
     },
 
@@ -65,6 +80,7 @@ export function createVoicePool(ctx: AudioContext, target: AudioNode): VoicePool
       const v = voicesByCode.get(code);
       if (!v) return;
       v.down = false;
+      try { v.env.gain.cancelAndHoldAtTime(Math.max(0, t0 - 1e-4)); } catch { }
       release(v.env, t0);
     },
 
@@ -73,7 +89,9 @@ export function createVoicePool(ctx: AudioContext, target: AudioNode): VoicePool
       let v = voicesByMidi.get(midi);
       if (!v) { v = createVoice(); voicesByMidi.set(midi, v); }
       v.down = true;
-      v.osc.frequency.setValueAtTime(midiToHz(midi), t0);
+
+      const hz = midiToHz(midi);
+      setFreqWithGlide(v.osc, hz, t0, 0.003);   // ~3ms glide
       attack(v.env, t0);
     },
 
@@ -81,8 +99,10 @@ export function createVoicePool(ctx: AudioContext, target: AudioNode): VoicePool
       const v = voicesByMidi.get(midi);
       if (!v) return;
       v.down = false;
-      if (release) release(v.env, t0);
-      else safeRelease(v.env, t0);
+
+      try { v.env.gain.cancelAndHoldAtTime(Math.max(0, t0 - 1e-4)); } catch { }
+      if (release) release(v.env, t0);              // <-- uses scheduleRelease above
+      // no immediate setValueAtTime(0) or similar here
     },
 
     allOff(t0) {
@@ -91,8 +111,8 @@ export function createVoicePool(ctx: AudioContext, target: AudioNode): VoicePool
     },
 
     dispose() {
-      for (const v of voicesByCode.values()) { try { v.osc.stop(); } catch {} try { v.osc.disconnect(); } catch {} try { v.env.disconnect(); } catch {} }
-      for (const v of voicesByMidi.values()) { try { v.osc.stop(); } catch {} try { v.osc.disconnect(); } catch {} try { v.env.disconnect(); } catch {} }
+      for (const v of voicesByCode.values()) { try { v.osc.stop(); } catch { } try { v.osc.disconnect(); } catch { } try { v.env.disconnect(); } catch { } }
+      for (const v of voicesByMidi.values()) { try { v.osc.stop(); } catch { } try { v.osc.disconnect(); } catch { } try { v.env.disconnect(); } catch { } }
       voicesByCode.clear();
       voicesByMidi.clear();
     },

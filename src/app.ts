@@ -17,10 +17,10 @@ const info = {
   needs: { time: true, fft: true },
   uiSections: [
     { id: 'vis', label: 'Visuals', color: '#121a1a' }, // mode + morph
+    { id: 'osc', label: 'Oscillator', color: '#16202a', enabledParam: '' },
 
     { id: 'arp', label: 'Arpeggiator', color: '#18212a' },
 
-    { id: 'osc', label: 'Oscillator', color: '#16202a', enabledParam: '' },
     { id: 'filt', label: 'Filter', color: '#1f1426', enabledParam: 'filt.on' },
     { id: 'lfo', label: 'LFO / Mod', color: '#1b2616', enabledParam: 'lfo.on' },
     { id: 'env', label: 'Envelope', color: '#261c16', enabledParam: 'env.on' },

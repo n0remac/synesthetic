@@ -193,7 +193,7 @@ export class ArpFromHub {
     private triggerStep(when: number) {
         if (this.order.length === 0) return;
         const stepDur = this.stepLen();
-        const dur = Math.max(0.008, Math.min(stepDur * this.params.gate, stepDur - 0.01));
+        const dur = Math.max(0.008, Math.min(stepDur * this.params.gate, stepDur - 0.012));
         const vel = this.params.velocity;
 
         if (this.params.pattern === 'chord') {
